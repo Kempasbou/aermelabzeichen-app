@@ -94,7 +94,7 @@ dialog img{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;back
   <!-- Einrichtung (nur einmal) -->
   <section id="setup" class="card hide">
     <h2>Einrichtung</h2>
-    <p class="muted">Beide Felder sind freiwillig. Ohne Anthropic-Schlüssel gibt es kein Foto-Prüfen, ohne GitHub-Schlüssel kein Aufnehmen – die Liste lässt sich immer herunterladen. Die Schlüssel bleiben nur auf diesem Gerät gespeichert.</p>
+    <p class="muted">Beide Felder sind freiwillig. Ohne Anthropic-Schlüssel gibt es kein Foto-Prüfen, ohne GitHub-Schlüssel kein Einsenden und Aufnehmen – die Liste lässt sich immer herunterladen. Die Schlüssel bleiben nur auf diesem Gerät gespeichert.</p>
     <div class="field"><label for="kAnth">Anthropic-Schlüssel</label><input id="kAnth" type="password" autocomplete="off" placeholder="sk-ant-…"></div>
     <div class="field"><label for="kGh">GitHub-Schlüssel (nur Repo „aermelabzeichen“)</label><input id="kGh" type="password" autocomplete="off" placeholder="github_pat_…"></div>
     <div class="field"><label for="kModel">Modell</label>
@@ -110,6 +110,16 @@ dialog img{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;back
     <input id="file" type="file" accept="image/*" multiple class="hide">
     <button class="big" id="btnFoto">📷 Foto prüfen</button>
     <p class="muted" id="fotoHint" style="text-align:center;margin:8px 0 16px">Ein oder mehrere Abzeichen auf einem Foto – gerade und gut beleuchtet.</p>
+
+    <div class="card" id="einsenden">
+      <h2>📤 Neue Abzeichen einsenden</h2>
+      <p class="muted" style="margin:0 0 10px">Abzeichen nebeneinander legen, von oben fotografieren und hier hochladen. Sie werden dann geprüft und eingetragen.</p>
+      <input id="fileUp" type="file" accept="image/*" multiple class="hide">
+      <div class="field" style="margin-bottom:10px"><label for="upNote">Bemerkung (freiwillig)</label>
+        <input id="upNote" type="text" placeholder="z. B. Dachau habe ich 3×"></div>
+      <button class="big" id="btnUp">📷 Foto hochladen</button>
+      <p class="muted" id="upStatus" style="text-align:center;margin:10px 0 0"></p>
+    </div>
 
     <div class="card filters">
       <input id="q" type="search" placeholder="🔍 Ort suchen …" autocomplete="off">
@@ -252,7 +262,7 @@ function renderStats(){
 function applyKeys(){
   const a=!!store.get("anthKey"),g=!!store.get("ghKey");
   $("btnFoto").classList.toggle("hide",!a);$("fotoHint").classList.toggle("hide",!a);
-  $("btnSave").classList.toggle("hide",!g);$("saveHint").textContent=g?"Nur angehakte Abzeichen werden aufgenommen.":"Zum Aufnehmen das Foto an Daniel schicken.";
+  $("btnSave").classList.toggle("hide",!g);$("einsenden").classList.toggle("hide",!g);if(g)loadEingang();$("saveHint").textContent=g?"Nur angehakte Abzeichen werden aufgenommen.":"Zum Aufnehmen das Foto an Daniel schicken.";
   $("sub").textContent=a?"Sammlung prüfen und erweitern":"Aktuelle Sammlung";
 }
 /* ---------- Interaktive Liste ---------- */
@@ -415,6 +425,36 @@ $("btnSave").onclick=async()=>{
     current=null;renderStats();refreshList();show("home");
     msg(`Gespeichert: ${[r.nNeu&&`${r.nNeu} neue Abzeichen`,r.nPlus&&`bei ${r.nPlus} die Anzahl erhöht`].filter(Boolean).join(", ")}.`,"good");window.scrollTo(0,0);
   }catch(e){show("result");msg(e.status==401||e.status==403?"Speichern nicht erlaubt – der GitHub-Schlüssel braucht Schreibrechte.":"Speichern hat nicht geklappt. Bitte noch einmal auf „Aufnehmen“ tippen.");console.error(e)}
+};
+
+/* ---------- Einsenden: nur Fotos in den Eingang ---------- */
+async function loadEingang(){
+  try{const l=await gh(`/contents/eingang?ref=${BRANCH}&t=${Date.now()}`,{cache:"no-store"});
+    const n=l.filter(f=>/\.jpe?g$/i.test(f.name)).length;
+    $("upStatus").textContent=n?`Warten auf Eintragung: ${n} Foto${n>1?"s":""}`:"";
+  }catch(e){$("upStatus").textContent=""}
+}
+$("btnUp").onclick=()=>$("fileUp").click();
+$("fileUp").onchange=async e=>{
+  const files=[...e.target.files]; e.target.value=""; if(!files.length)return; msg("");
+  try{
+    const tree=[],d=new Date(),stamp=`${today()}-${String(d.getHours()).padStart(2,"0")}${String(d.getMinutes()).padStart(2,"0")}${String(d.getSeconds()).padStart(2,"0")}`;
+    for(let i=0;i<files.length;i++){
+      busy(files.length>1?`Foto ${i+1} von ${files.length} wird hochgeladen …`:"Foto wird hochgeladen …");
+      const c=toCanvas(await readImg(files[i]),2400);
+      tree.push({path:`eingang/${stamp}-${i+1}.jpg`,mode:"100644",type:"blob",sha:await blob(c.toDataURL("image/jpeg",.88).split(",")[1],"base64")});
+    }
+    const note=$("upNote").value.trim();
+    if(note)tree.push({path:`eingang/${stamp}-bemerkung.txt`,mode:"100644",type:"blob",sha:await blob(b64utf8(note+"\n"),"base64")});
+    const put=async()=>{const ref=await gh(`/git/ref/heads/${BRANCH}`),base=ref.object.sha,bc=await gh(`/git/commits/${base}`);
+      const t=await gh("/git/trees",{method:"POST",body:JSON.stringify({base_tree:bc.tree.sha,tree})});
+      const c=await gh("/git/commits",{method:"POST",body:JSON.stringify({message:`Sendet ${files.length} Foto${files.length>1?"s":""} zur Eintragung ein`,tree:t.sha,parents:[base]})});
+      await gh(`/git/refs/heads/${BRANCH}`,{method:"PATCH",body:JSON.stringify({sha:c.sha})});};
+    try{await put()}catch(err){if(err.status===422||err.status===409)await put();else throw err}
+    $("upNote").value=""; show("home"); window.scrollTo(0,0);
+    msg(`Danke! ${files.length>1?files.length+" Fotos sind":"Das Foto ist"} angekommen und ${files.length>1?"werden":"wird"} bald eingetragen.`,"good"); loadEingang();
+  }catch(err){show("home");console.error(err);
+    msg(err.status==401||err.status==403||err.status==404?"Hochladen nicht erlaubt – der GitHub-Schlüssel fehlt oder hat keine Schreibrechte.":"Hochladen hat nicht geklappt. Bitte Internet prüfen und noch einmal versuchen.")}
 };
 
 /* ---------- Download ---------- */
