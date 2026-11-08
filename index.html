@@ -74,6 +74,9 @@ footer button{background:none;border:0;color:var(--muted);font-size:15px;text-de
 .tile .bez{font-size:13px}
 .badge{position:absolute;top:8px;right:8px;background:var(--red);color:#fff;font-weight:700;font-size:14px;border-radius:99px;padding:1px 8px}
 .tile .chip{font-size:12px}
+.toggle{width:100%;font-size:17px;font-weight:600;padding:12px;border-radius:12px;border:2px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+.toggle[aria-pressed="true"]{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.tile .chip.ok{font-size:12px}
 .link{background:none;border:0;color:var(--muted);font-size:15px;text-decoration:underline;cursor:pointer}
 input[type=search]{width:100%;font-size:17px;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
 dialog{border:0;border-radius:18px;padding:16px;max-width:min(560px,94vw);background:var(--card);color:var(--ink)}
@@ -117,6 +120,7 @@ dialog img{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;back
       <div class="seg" id="sort">
         <button data-s="region" class="on">Nach Region</button><button data-s="az">Ort A–Z</button><button data-s="neu">Neueste</button>
       </div>
+      <button class="toggle" id="fTausch" aria-pressed="false">🔁 Doppelte zum Tauschen</button>
       <div class="muted" id="count"></div>
     </div>
     <div id="list"></div>
@@ -253,7 +257,8 @@ function applyKeys(){
 }
 /* ---------- Interaktive Liste ---------- */
 const BAY=["Oberbayern","Niederbayern","Oberpfalz","Oberfranken","Mittelfranken","Unterfranken","Schwaben"];
-let view={q:"",bl:"",rb:"",sort:"region"};
+let view={q:"",bl:"",rb:"",sort:"region",tausch:false};
+const spare=r=>Math.max(0,(parseInt(r.anzahl)||1)-1);
 const blOf=r=>r.bundesland||"Ohne Ort";
 const rbOf=r=>r.regierungsbezirk||"";
 const isGuess=r=>/^vermutlich/i.test(r.notiz||"");
@@ -266,7 +271,7 @@ function tile(r){
   return `<div class="tile" data-id="${esc(r.id)}">${n>1?`<span class="badge">${n}×</span>`:""}
     ${r.foto?`<img loading="lazy" src="${RAW}fotos/${encodeURIComponent(r.foto)}" alt="">`:`<div style="aspect-ratio:1"></div>`}
     <div class="ort">${esc(ortName(r))}</div><div class="bez">${esc(r.landkreis?("Lkr. "+r.landkreis).replace("Lkr. kreisfreie Stadt","kreisfreie Stadt"):"")}</div>
-    ${isGuess(r)?`<span class="chip warn">vermutlich</span>`:""}</div>`;
+    ${spare(r)?`<span class="chip ok">${spare(r)} zum Tauschen</span> `:""}${isGuess(r)?`<span class="chip warn">vermutlich</span>`:""}</div>`;
 }
 function renderFilters(){
   opts($("fBl"),[...countBy(rows,blOf)].sort((a,b)=>blOrder(a[0],b[0])),"Alle Bundesländer",view.bl);
@@ -277,11 +282,14 @@ function renderFilters(){
 }
 function renderList(){
   const q=view.q.trim().toLowerCase();
-  let rs=rows.filter(r=>(!view.bl||blOf(r)===view.bl)&&(!view.rb||rbOf(r)===view.rb)&&
+  const nT=rows.filter(spare).length;
+  $("fTausch").textContent=`🔁 Doppelte zum Tauschen (${nT})`;$("fTausch").setAttribute("aria-pressed",view.tausch);
+  let rs=rows.filter(r=>(!view.bl||blOf(r)===view.bl)&&(!view.rb||rbOf(r)===view.rb)&&(!view.tausch||spare(r))&&
     (!q||[r.gemeinde,r.ortsteil,r.aufschrift,r.landkreis].join(" ").toLowerCase().includes(q)));
-  $("count").textContent=`${rs.length} von ${rows.length} Abzeichen · ${sum(rs)} Stück`;
+  $("count").textContent=view.tausch?`${rs.length} Abzeichen · ${rs.reduce((a,r)=>a+spare(r),0)} Stück zum Tauschen`
+    :`${rs.length} von ${rows.length} Abzeichen · ${sum(rs)} Stück`;
   const byName=(a,b)=>ortName(a).localeCompare(ortName(b),"de");
-  if(!rs.length){$("list").innerHTML=`<div class="card empty muted">Nichts gefunden.</div>`;return}
+  if(!rs.length){$("list").innerHTML=`<div class="card empty muted">${view.tausch&&!nT?"Noch keine doppelten Abzeichen.":"Nichts gefunden."}</div>`;return}
   if(view.sort==="az"){$("list").innerHTML=`<div class="grid">${rs.sort(byName).map(tile).join("")}</div>`;return}
   if(view.sort==="neu"){$("list").innerHTML=`<div class="grid">${rs.sort((a,b)=>(b.erfasst||"").localeCompare(a.erfasst||"")||b.id.localeCompare(a.id)).map(tile).join("")}</div>`;return}
   const g=new Map();rs.forEach(r=>{const k=blOf(r);if(!g.has(k))g.set(k,[]);g.get(k).push(r)});
@@ -295,11 +303,12 @@ function refreshList(){renderFilters();renderList()}
 $("q").oninput=e=>{view.q=e.target.value;renderList()};
 $("fBl").onchange=e=>{view.bl=e.target.value;view.rb="";refreshList()};
 $("fRb").onchange=e=>{view.rb=e.target.value;renderList()};
+$("fTausch").onclick=()=>{view.tausch=!view.tausch;renderList()};
 document.querySelectorAll("#sort button").forEach(b=>b.onclick=()=>{view.sort=b.dataset.s;
   document.querySelectorAll("#sort button").forEach(x=>x.classList.toggle("on",x===b));renderList()});
 $("list").onclick=e=>{const t=e.target.closest(".tile");if(!t)return;const r=rows.find(x=>x.id===t.dataset.id);if(!r)return;
   $("zoomImg").src=r.foto?RAW+"fotos/"+encodeURIComponent(r.foto):"";
-  $("zoomTxt").innerHTML=`<b>${esc(ortName(r))}</b><br>${esc(bezirk(r))}<br><span class="muted">Nr. ${esc(r.id)} · ${parseInt(r.anzahl)||1}× vorhanden${r.wappen?" · Wappen: "+esc(r.wappen):""}</span>`+
+  $("zoomTxt").innerHTML=`<b>${esc(ortName(r))}</b><br>${esc(bezirk(r))}<br><span class="muted">Nr. ${esc(r.id)} · ${parseInt(r.anzahl)||1}× vorhanden${spare(r)?` (${spare(r)} zum Tauschen)`:""}${r.wappen?" · Wappen: "+esc(r.wappen):""}</span>`+
     (isGuess(r)?`<div class="why" style="margin-top:8px">${esc(r.notiz.split("; per App")[0])}</div>`:"");
   $("zoom").showModal()};
 $("zoomClose").onclick=()=>$("zoom").close();
