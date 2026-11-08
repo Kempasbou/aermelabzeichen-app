@@ -10,7 +10,7 @@ Die Daten liegen im privaten Repo `Kempasbou/aermelabzeichen`; diese Seite enth�
 
 ## Einrichtung (einmal pro Gerät)
 
-Unter „Einstellungen“ eintragen – wird nur im Browser des Geräts gespeichert:
+Beide Schlüssel sind freiwillig (unter „Einstellungen“, nur im Browser des Geräts gespeichert). Ohne Schlüssel: nur Liste ansehen und herunterladen.
 
-1. **Anthropic-Schlüssel** aus console.anthropic.com (API Keys).
-2. **GitHub-Schlüssel**: Fine-grained Personal Access Token, *Repository access* nur `aermelabzeichen`, *Permissions → Contents: Read and write*.
+1. **Anthropic-Schlüssel** (console.anthropic.com → API Keys) – schaltet „Foto prüfen“ frei.
+2. **GitHub-Schlüssel** – schaltet „Aufnehmen“ frei: Fine-grained Personal Access Token, *Repository access* nur `aermelabzeichen`, *Permissions → Contents: Read and write*.
