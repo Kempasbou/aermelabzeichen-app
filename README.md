@@ -6,7 +6,7 @@ Einfache Web-Seite (GitHub Pages) für die Ärmelabzeichen-Sammlung.
 - **Aufnehmen**: angehakte Abzeichen werden in die Liste geschrieben (neue Zeile bzw. Anzahl +1), Einzelbilder werden ausgeschnitten und gespeichert.
 - **Liste herunterladen**: aktuelle Liste als CSV (öffnet in Excel).
 
-Die Daten liegen im privaten Repo `Kempasbou/aermelabzeichen`; diese Seite enthält keine Daten und keine Schlüssel.
+Die Daten liegen im Repo `Kempasbou/aermelabzeichen`; diese Seite enthält keine Daten und keine Schlüssel.
 
 ## Einrichtung (einmal pro Gerät)
 
