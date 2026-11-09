@@ -157,7 +157,7 @@ dialog img{width:100%;max-height:60vh;object-fit:contain;border-radius:12px;back
 
 <script>
 const OWNER="Kempasbou", REPO="aermelabzeichen", BRANCH="main", CSVPATH="sammlung.csv";
-const HEAD=["id","gemeinde","ortsteil","landkreis","regierungsbezirk","bundesland","wappen","aufschrift","anzahl","foto","erfasst","notiz"];
+const HEAD=["id","gemeinde","ortsteil","landkreis","regierungsbezirk","bundesland","wappen","aufschrift","anzahl","foto","erfasst","notiz","ablage"];
 const $=id=>document.getElementById(id);
 const store={get(k){try{return localStorage.getItem(k)||""}catch(e){return ""}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
 let rows=[], current=null; // current = {items:[], photos:[{img,b64}], }
@@ -318,7 +318,7 @@ document.querySelectorAll("#sort button").forEach(b=>b.onclick=()=>{view.sort=b.
   document.querySelectorAll("#sort button").forEach(x=>x.classList.toggle("on",x===b));renderList()});
 $("list").onclick=e=>{const t=e.target.closest(".tile");if(!t)return;const r=rows.find(x=>x.id===t.dataset.id);if(!r)return;
   $("zoomImg").src=r.foto?RAW+"fotos/"+encodeURIComponent(r.foto):"";
-  $("zoomTxt").innerHTML=`<b>${esc(ortName(r))}</b><br>${esc(bezirk(r))}<br><span class="muted">Nr. ${esc(r.id)} · ${parseInt(r.anzahl)||1}× vorhanden${spare(r)?` (${spare(r)} zum Tauschen)`:""}${r.wappen?" · Wappen: "+esc(r.wappen):""}</span>`+
+  $("zoomTxt").innerHTML=`<b>${esc(ortName(r))}</b><br>${esc(bezirk(r))}<br><span class="muted">Nr. ${esc(r.id)} · ${parseInt(r.anzahl)||1}× vorhanden${spare(r)?` (${spare(r)} zum Tauschen)`:""}${r.wappen?" · Wappen: "+esc(r.wappen):""}${r.ablage?"<br>📁 "+esc(r.ablage):""}</span>`+
     (isGuess(r)?`<div class="why" style="margin-top:8px">${esc(r.notiz.split("; per App")[0])}</div>`:"");
   $("zoom").showModal()};
 $("zoomClose").onclick=()=>$("zoom").close();
