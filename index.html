@@ -187,7 +187,7 @@ function slug(s){return s.toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").
 function b64utf8(s){const b=new TextEncoder().encode(s);let x="";for(let i=0;i<b.length;i+=0x8000)x+=String.fromCharCode(...b.subarray(i,i+0x8000));return btoa(x)}
 function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
 function ortName(r){return r.ortsteil?`${r.ortsteil} (${r.gemeinde})`:(r.gemeinde||r.aufschrift||"Sonderabzeichen")}
-function bezirk(r){return (r.kategorie==="Werkfeuerwehr"?"Werkfeuerwehr · ":"")+[r.bundesland,r.regierungsbezirk].filter(Boolean).join(", ")+(lkTxt(r)?" · "+lkTxt(r):"")}
+function bezirk(r){return (["Werkfeuerwehr","Sonstige Organisationen","Sonderabzeichen"].includes(r.kategorie)?r.kategorie+" · ":"")+[r.bundesland,r.regierungsbezirk].filter(Boolean).join(", ")+(lkTxt(r)?" · "+lkTxt(r):"")}
 function today(){const d=new Date();return d.toISOString().slice(0,10)}
 function sum(rs){return rs.reduce((a,r)=>a+(parseInt(r.anzahl)||1),0)}
 function show(...ids){["setup","home","busy","result"].forEach(i=>$(i).classList.toggle("hide",!ids.includes(i)))}
@@ -271,26 +271,26 @@ function applyKeys(){
 const BAY=["Oberbayern","Niederbayern","Oberpfalz","Oberfranken","Mittelfranken","Unterfranken","Schwaben"];
 let view={q:"",bl:"",rb:"",sort:"region",tausch:false};
 const spare=r=>Math.max(0,(parseInt(r.anzahl)||1)-1);
-const blOf=r=>r.kategorie==="Werkfeuerwehr"?"Werkfeuerwehren":(r.kategorie==="Sonderabzeichen"?"Sonderabzeichen":(r.bundesland||"Ohne Ort"));
-const rbOf=r=>r.kategorie==="Werkfeuerwehr"?(r.bundesland||""):(r.regierungsbezirk||"");
+const blOf=r=>r.kategorie==="Werkfeuerwehr"?"Werkfeuerwehren":r.kategorie==="Sonstige Organisationen"?"Sonstige Organisationen":(r.kategorie==="Sonderabzeichen"?"Sonderabzeichen":(r.bundesland||"Ohne Ort"));
+const rbOf=r=>(r.kategorie==="Werkfeuerwehr"||r.kategorie==="Sonstige Organisationen")?(r.bundesland||""):r.kategorie==="Sonderabzeichen"?"":(r.regierungsbezirk||"");
 const isGuess=r=>/^vermutlich/i.test(r.notiz||"");
 function opts(sel,items,all,val){sel.innerHTML=`<option value="">${all}</option>`+items.map(([k,n])=>`<option value="${esc(k)}">${esc(k)} (${n})</option>`).join("");sel.value=val}
 function countBy(rs,f){const m=new Map();rs.forEach(r=>{const k=f(r);if(k)m.set(k,(m.get(k)||0)+1)});return m}
-function blRank(a){return a==="Bayern"?0:BL.includes(a)?1:a==="Werkfeuerwehren"?2:(a==="Sonderabzeichen"||a==="Ohne Ort")?4:3}
+function blRank(a){return a==="Bayern"?0:BL.includes(a)?1:a==="Werkfeuerwehren"?2:a==="Sonstige Organisationen"?2.5:(a==="Sonderabzeichen"||a==="Ohne Ort")?4:3}
 function blOrder(a,b){return blRank(a)-blRank(b)||a.localeCompare(b,"de")}
 function rbOrder(a,b){if(a==="Bayern"&&b!=="Bayern")return -1;if(b==="Bayern"&&a!=="Bayern")return 1;const i=BAY.indexOf(a),j=BAY.indexOf(b);if(i>=0&&j>=0)return i-j;if(!a)return 1;if(!b)return -1;return a.localeCompare(b,"de")}
 function tile(r){
   const n=parseInt(r.anzahl)||1;
   return `<div class="tile" data-id="${esc(r.id)}">${n>1?`<span class="badge">${n}×</span>`:""}
     ${r.foto?`<img loading="lazy" src="${RAW}fotos/${encodeURIComponent(r.foto)}" alt="">`:`<div style="aspect-ratio:1"></div>`}
-    <div class="ort">${esc(ortName(r))}</div><div class="bez">${esc(r.kategorie==="Werkfeuerwehr"?[r.bundesland,lkTxt(r)].filter(Boolean).join(" · "):lkTxt(r))}</div>
+    <div class="ort">${esc(ortName(r))}</div><div class="bez">${esc((r.kategorie==="Werkfeuerwehr"||r.kategorie==="Sonstige Organisationen")?[r.bundesland,lkTxt(r)].filter(Boolean).join(" · "):lkTxt(r))}</div>
     ${spare(r)?`<span class="chip ok">${spare(r)} zum Tauschen</span> `:""}${isGuess(r)?`<span class="chip warn">vermutlich</span>`:""}</div>`;
 }
 function renderFilters(){
-  opts($("fBl"),[...countBy(rows,blOf)].sort((a,b)=>blOrder(a[0],b[0])),"Alle Bundesländer, Länder und Werkfeuerwehren",view.bl);
+  opts($("fBl"),[...countBy(rows,blOf)].sort((a,b)=>blOrder(a[0],b[0])),"Alle Kategorien",view.bl);
   const base=view.bl?rows.filter(r=>blOf(r)===view.bl):rows;
   const rbs=[...countBy(base,rbOf)].sort((a,b)=>rbOrder(a[0],b[0]));
-  opts($("fRb"),rbs,view.bl==="Bayern"?"Alle Regierungsbezirke":(view.bl==="Werkfeuerwehren"?"Alle Bundesländer":"Alle Bezirke/Regionen"),view.rb);
+  opts($("fRb"),rbs,view.bl==="Bayern"?"Alle Regierungsbezirke":((view.bl==="Werkfeuerwehren"||view.bl==="Sonstige Organisationen")?"Alle Bundesländer":"Alle Bezirke/Regionen"),view.rb);
   $("fRb").disabled=!rbs.length; if(!rbs.length&&view.rb){view.rb="";$("fRb").value=""}
 }
 function renderList(){
